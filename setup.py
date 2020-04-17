@@ -5,7 +5,7 @@ with open("README.md") as f:
 
 setuptools.setup(
     name="ips.py",
-    version="0.1.0",
+    version="0.1.1",
     author="friedkeenan",
     description="A Python library for handling IPS patches",
     long_description=long_description,

@@ -10,8 +10,8 @@ def unpack_file(fmt, f):
 
 class Patch:
     class Record:
-        def __init__(self, patch, offset, cont, rle_size=-1):
-            if rle_size >= 0 and len(cont) != 1:
+        def __init__(self, patch, offset, content, rle_size=-1):
+            if rle_size >= 0 and len(content) != 1:
                 raise ValueError("Invalid content for an RLE record")
 
             if (not patch.ips32 and offset > 0xFFFFFF) or (patch.ips32 and offset > 0xFFFFFFFF):
@@ -20,12 +20,12 @@ class Patch:
             if rle_size > 0xFFFF: # If the RLE size can't fit in 16 bits
                 raise ValueError("RLE size is too large")
 
-            if rle_size < 0 and len(cont) > 0xFFFF: # If the size can't fit in 16 bits
+            if rle_size < 0 and len(content) > 0xFFFF: # If the size can't fit in 16 bits
                 raise ValueError("Length of content is too large")
 
             self.patch = patch
             self.offset = offset
-            self.cont = cont
+            self.content = content
             self.rle_size = rle_size
 
         def __bytes__(self):
@@ -38,14 +38,14 @@ class Patch:
             if self.rle_size >= 0:
                 buf += struct.pack(">HH", 0, self.rle_size)
             else:
-                buf += struct.pack(">H", len(self.cont))
+                buf += struct.pack(">H", len(self.content))
 
-            buf += self.cont
+            buf += self.content
 
             return buf
 
         def __eq__(self, other):
-            ret = self.offset == other.offset and self.cont == other.cont
+            ret = self.offset == other.offset and self.content == other.content
 
             if self.rle_size > 0 or other.rle_size > 0:
                 if self.rle_size != other.rle_size:
@@ -66,8 +66,11 @@ class Patch:
     def tail(self):
         return b"EEOF" if self.ips32 else b"EOF"
 
-    def add_record(self, offset, cont, rle_size=-1):
-        self.records.append(self.Record(self, offset, cont, rle_size))
+    def add_record(self, offset, content, rle_size=-1):
+        if offset > 0xFFFFFF:
+            self.ips32 = True
+
+        self.records.append(self.Record(self, offset, content, rle_size))
 
     def apply(self, old_f, new_f):
         if isinstance(old_f, (bytes, bytearray)):
@@ -80,9 +83,9 @@ class Patch:
             new_f.write(old_f.read(r.offset - curr_off))
 
             if r.rle_size >= 0:
-                new_f.write(r.cont * r.rle_size)
+                new_f.write(r.content * r.rle_size)
             else:
-                new_f.write(r.cont)
+                new_f.write(r.content)
 
             curr_off = new_f.tell()
 
@@ -138,11 +141,11 @@ class Patch:
 
             rle_size = -1
             if size == 0:
-                rle_size, cont = unpack_file(">Hc", f)
+                rle_size, content = unpack_file(">Hc", f)
             else:
-                cont = unpack_file(f"{size}s", f)
+                content = unpack_file(f"{size}s", f)
 
-            p.add_record(offset, cont, rle_size)
+            p.add_record(offset, content, rle_size)
 
     @classmethod
     def create(cls, old_f, new_f):
