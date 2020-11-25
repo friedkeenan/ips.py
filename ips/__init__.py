@@ -133,7 +133,7 @@ class Patch:
                 return p
 
             if ips32:
-                offset = struct.unpck(">I", offset)[0]
+                offset = struct.unpack(">I", offset)[0]
             else:
                 offset = struct.unpack(">I", b"\x00" + offset)[0]
 
